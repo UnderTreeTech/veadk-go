@@ -12,25 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package knowledgebase
 
-const (
-	DEFAULT_MODEL_AGENT_NAME     = "doubao-seed-1-6-250615"
-	DEFAULT_MODEL_AGENT_PROVIDER = "openai"
-	DEFAULT_MODEL_AGENT_API_BASE = "https://ark.cn-beijing.volces.com/api/v3/"
-)
+import "errors"
 
-// LOGGING
-const (
-	DEFAULT_LOGGING_LEVER = "info"
-)
+type Config struct {
+	Name          string
+	Description   string
+	BackendType   KnowledgeBackendType
+	BackendConfig map[string]any
+	TopK          int
+	AppName       string
+	Index         string
+}
 
-const DEFAULT_LLMAGENT_NAME = "veLLMAgent"
-
-const VEFAAS_IAM_CRIDENTIAL_PATH = "/var/run/secrets/iam/credential"
-
-// MEMORY
-const (
-	DEFAULT_SHORT_TERM_MEMORY_BACKEND = "local"
-	DEFAULT_GORM_LOG_LEVEL            = "error"
-)
+func BuildKnowledgeBase(cfg Config) (*Knowledge, error) {
+	switch cfg.BackendType {
+	case VikingBackend:
+		return NewInMemoryKnowledgeBackend(kb.Index)
+	default:
+		return nil, errors.New("Unsupported knowledge backend: " + string(cfg.BackendType))
+	}
+}

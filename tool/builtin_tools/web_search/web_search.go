@@ -56,11 +56,11 @@ type webSearchArgs struct {
 	Query string `json:"query" jsonschema:"The query to search"`
 }
 
-type webSearchResult struct {
+type WebSearchResult struct {
 	Result []string `json:"result,omitempty"`
 }
 
-func WebSearch(ctx tool.Context, args webSearchArgs) (webSearchResult, error) {
+func WebSearch(ctx tool.Context, args webSearchArgs) (WebSearchResult, error) {
 	// Search a query in websites.
 	// Args:
 	// 		query: The query to search.
@@ -69,7 +69,7 @@ func WebSearch(ctx tool.Context, args webSearchArgs) (webSearchResult, error) {
 	var ak string
 	var sk string
 	//var sessionToken string
-	var out = webSearchResult{Result: make([]string, 0)}
+	var out = WebSearchResult{Result: make([]string, 0)}
 
 	if ctx != nil {
 		ak = getStringFromToolContext(ctx, common.VOLCENGINE_ACCESS_KEY)

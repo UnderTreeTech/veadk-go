@@ -12,25 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
-
-const (
-	DEFAULT_MODEL_AGENT_NAME     = "doubao-seed-1-6-250615"
-	DEFAULT_MODEL_AGENT_PROVIDER = "openai"
-	DEFAULT_MODEL_AGENT_API_BASE = "https://ark.cn-beijing.volces.com/api/v3/"
-)
-
-// LOGGING
-const (
-	DEFAULT_LOGGING_LEVER = "info"
-)
-
-const DEFAULT_LLMAGENT_NAME = "veLLMAgent"
-
-const VEFAAS_IAM_CRIDENTIAL_PATH = "/var/run/secrets/iam/credential"
-
-// MEMORY
-const (
-	DEFAULT_SHORT_TERM_MEMORY_BACKEND = "local"
-	DEFAULT_GORM_LOG_LEVEL            = "error"
-)
+package ve_tos

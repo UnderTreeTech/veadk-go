@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"strings"
 	"time"
@@ -65,7 +64,6 @@ func (c *Client) DoRequest(ak, sk string, header map[string]string, body []byte)
 	queries.Set("Action", c.config.Action)
 	queries.Set("Version", c.config.Version)
 	requestAddr := fmt.Sprintf("%s%s?%s", c.config.Host, Path, queries.Encode())
-	log.Printf("request addr: %s\n", requestAddr)
 
 	request, err := http.NewRequest(c.config.Method, requestAddr, bytes.NewBuffer(body))
 	if err != nil {
@@ -107,10 +105,8 @@ func (c *Client) DoRequest(ak, sk string, header map[string]string, body []byte)
 		strings.Join(signedHeaders, ";"),
 		payload,
 	}, "\n")
-	log.Printf("canonical string:\n%s\n", canonicalString)
 
 	hashedCanonicalString := hex.EncodeToString(hashSHA256([]byte(canonicalString)))
-	log.Printf("hashed canonical string: %s\n", hashedCanonicalString)
 
 	credentialScope := authDate + "/" + c.config.Region + "/" + c.config.Service + "/request"
 	signString := strings.Join([]string{
@@ -119,11 +115,9 @@ func (c *Client) DoRequest(ak, sk string, header map[string]string, body []byte)
 		credentialScope,
 		hashedCanonicalString,
 	}, "\n")
-	log.Printf("sign string:\n%s\n", signString)
 
 	signedKey := getSignedKey(sk, authDate, c.config.Region, c.config.Service)
 	signature := hex.EncodeToString(hmacSHA256(signedKey, signString))
-	log.Printf("signature: %s\n", signature)
 
 	authorization := "HMAC-SHA256" +
 		" Credential=" + ak + "/" + credentialScope +
@@ -131,13 +125,6 @@ func (c *Client) DoRequest(ak, sk string, header map[string]string, body []byte)
 		", Signature=" + signature
 	request.Header.Set("Authorization", authorization)
 	log.Printf("authorization: %s\n", authorization)
-
-	requestRaw, err := httputil.DumpRequest(request, true)
-	if err != nil {
-		return result, fmt.Errorf("web search dump request err: %w", err)
-	}
-
-	log.Printf("request:\n%s\n", string(requestRaw))
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {

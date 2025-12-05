@@ -12,4 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package agent
+package configs
+
+import "github.com/volcengine/veadk-go/common"
+
+type Volcengine struct {
+	AK string `yaml:"access_key"`
+	SK string `yaml:"secret_key"`
+}
+
+func (v *Volcengine) MapEnvToConfig() {
+	v.AK = getEnv(common.VOLCENGINE_ACCESS_KEY, "", true)
+	v.SK = getEnv(common.VOLCENGINE_SECRET_KEY, "", true)
+}

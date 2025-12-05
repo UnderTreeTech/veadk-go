@@ -2,7 +2,9 @@ model:
   agent:
     name: "doubao-seed-1-6-250615"
     api_base: "test"
-
+volcengine:
+  access_key:
+  secret_key:
 database:
   short_term_memory_backend: postgresql
   postgresql:

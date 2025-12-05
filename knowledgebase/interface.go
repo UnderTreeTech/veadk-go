@@ -12,25 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package knowledgebase
 
-const (
-	DEFAULT_MODEL_AGENT_NAME     = "doubao-seed-1-6-250615"
-	DEFAULT_MODEL_AGENT_PROVIDER = "openai"
-	DEFAULT_MODEL_AGENT_API_BASE = "https://ark.cn-beijing.volces.com/api/v3/"
-)
-
-// LOGGING
-const (
-	DEFAULT_LOGGING_LEVER = "info"
-)
-
-const DEFAULT_LLMAGENT_NAME = "veLLMAgent"
-
-const VEFAAS_IAM_CRIDENTIAL_PATH = "/var/run/secrets/iam/credential"
-
-// MEMORY
-const (
-	DEFAULT_SHORT_TERM_MEMORY_BACKEND = "local"
-	DEFAULT_GORM_LOG_LEVEL            = "error"
-)
+type Knowledge interface {
+	Index() string
+	AddFromDirectory(directory string, opts map[string]any) bool
+	AddFromFiles(files []string, opts map[string]any) bool
+	AddFromText(text []string, opts map[string]any) bool
+	Search(query string, topK int, opts map[string]any) []Entry
+}

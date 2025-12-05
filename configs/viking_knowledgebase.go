@@ -14,4 +14,16 @@
 
 package configs
 
-type VikingKnowledgebaseConfig struct{}
+import "github.com/volcengine/veadk-go/common"
+
+type VikingKnowledgeBaseConfig struct {
+	ResourceID string //ResourceID or Index + Project
+	Index      string
+	Project    string
+}
+
+func (v *VikingKnowledgeBaseConfig) MapEnvToConfig() {
+	v.ResourceID = getEnv(common.VIKING_KNOWLEDGE_RESOURCE_ID, "", true)
+	v.Index = getEnv(common.VIKING_KNOWLEDGE_NAME, "", true)
+	v.Project = getEnv(common.VIKING_KNOWLEDGE_PROJECT, "", true)
+}

@@ -26,11 +26,12 @@ import (
 )
 
 type VeADKConfig struct {
+	Volcengine          *Volcengine                `yaml:"volcengine"`
 	Model               *ModelConfig               `yaml:"model"`
 	Tool                *BuiltinToolConfigs        `yaml:"tool"`
 	PromptPilot         *PromptPilotConfig         `yaml:"prompt_pilot"`
 	TlsConfig           *TLSConfig                 `yaml:"tls_config"`
-	VikingKnowledgebase *VikingKnowledgebaseConfig `yaml:"viking_knowledgebase"`
+	VikingKnowledgeBase *VikingKnowledgeBaseConfig `yaml:"viking_knowledge_base"`
 	Veidentity          *VeIdentityConfig          `yaml:"veidentity"`
 	Database            *DatabaseConfig            `yaml:"database"`
 	LOGGING             *Logging                   `yaml:"LOGGING"`
@@ -60,13 +61,14 @@ func SetupVeADKConfig() error {
 	}
 	// 3. 从环境变量构建最终配置
 	globalConfig = &VeADKConfig{
+		Volcengine: &Volcengine{},
 		Model: &ModelConfig{
 			Agent: &AgentConfig{},
 		},
 		Tool:                &BuiltinToolConfigs{},
 		PromptPilot:         &PromptPilotConfig{},
 		TlsConfig:           &TLSConfig{},
-		VikingKnowledgebase: &VikingKnowledgebaseConfig{},
+		VikingKnowledgeBase: &VikingKnowledgeBaseConfig{},
 		Veidentity:          &VeIdentityConfig{},
 		LOGGING:             &Logging{},
 		Database: &DatabaseConfig{
