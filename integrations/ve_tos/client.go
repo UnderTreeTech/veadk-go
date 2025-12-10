@@ -101,7 +101,7 @@ func New(cfg *Config) (*Client, error) {
 		cfg.Endpoint = utils.GetEnvWithDefault(common.DATABASE_TOS_ENDPOINT, configs.GetGlobalConfig().Database.TOS.Endpoint, fmt.Sprintf("https://tos-%s.volces.com", cfg.Region))
 	}
 	if cfg.Bucket == "" {
-		cfg.Bucket = utils.GetEnvWithDefault(common.DATABASE_TOS_BUCKET, configs.GetGlobalConfig().Database.TOS.Bucket)
+		cfg.Bucket = utils.GetEnvWithDefault(common.DATABASE_TOS_BUCKET, configs.GetGlobalConfig().Database.TOS.Bucket, common.DEFAULT_DATABASE_TOS_BUCKET)
 	}
 
 	if err := cfg.validate(); err != nil {

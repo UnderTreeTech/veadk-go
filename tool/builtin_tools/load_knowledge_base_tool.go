@@ -25,7 +25,7 @@ type QueryKnowledgeReq struct {
 	Query string `json:"query" jsonschema:"The query for loading the knowledge base for this tool"`
 }
 
-type WebSearchResult struct {
+type KnowledgeBaseResult struct {
 	Result []ktypes.KnowledgeEntry `json:"result,omitempty"`
 }
 
@@ -36,12 +36,12 @@ type WebSearchResult struct {
 // Returns:
 // A list of knowledge base results.
 func LoadKnowledgeBaseTool(knowledge *knowledgebase.KnowledgeBase) (tool.Tool, error) {
-	handler := func(ctx tool.Context, req *QueryKnowledgeReq) (WebSearchResult, error) {
+	handler := func(ctx tool.Context, req *QueryKnowledgeReq) (KnowledgeBaseResult, error) {
 		result, err := knowledge.Backend.Search(req.Query)
 		if err != nil {
-			return WebSearchResult{}, err
+			return KnowledgeBaseResult{}, err
 		}
-		return WebSearchResult{
+		return KnowledgeBaseResult{
 			Result: result,
 		}, nil
 

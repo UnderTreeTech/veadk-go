@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/volcengine/veadk-go/agents/llmagent"
+	veagent "github.com/volcengine/veadk-go/agent"
 	"github.com/volcengine/veadk-go/common"
 	"github.com/volcengine/veadk-go/integrations/ve_tos"
 	"github.com/volcengine/veadk-go/knowledgebase"
@@ -28,6 +28,7 @@ import (
 	"github.com/volcengine/veadk-go/prompts"
 	"github.com/volcengine/veadk-go/utils"
 	"google.golang.org/adk/agent"
+	"google.golang.org/adk/memory"
 	"google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
 	"google.golang.org/genai"
@@ -51,40 +52,47 @@ func main() {
 		log.Fatal("NewVikingKnowledgeBackend error: ", err)
 	}
 
-	cfg := llmagent.Config{
+	cfg := veagent.Config{
 		ModelName:     common.DEFAULT_MODEL_AGENT_NAME,
-		ModelApiBase:  common.DEFAULT_MODEL_AGENT_API_BASE,
-		ModelApiKey:   utils.GetEnvWithDefault(common.MODEL_AGENT_API_KEY),
+		ModelAPIBase:  common.DEFAULT_MODEL_AGENT_API_BASE,
+		ModelAPIKey:   utils.GetEnvWithDefault(common.MODEL_AGENT_API_KEY),
 		KnowledgeBase: knowledgeBase,
 	}
-	cfg.Name = "veadk-llmagent"
 	cfg.Instruction = prompts.DEFAULT_INSTRUCTION
 	cfg.Description = prompts.DEFAULT_DESCRIPTION
 
-	a, err := llmagent.New(cfg)
+	a, err := veagent.New(&cfg)
 	if err != nil {
 		fmt.Printf("NewLLMAgent failed: %v", err)
 		return
 	}
 
 	sessionService := session.InMemoryService()
+	memoryService := memory.InMemoryService()
 	runner, err := runner.New(runner.Config{
 		AppName:        "coffice agent",
 		Agent:          a,
 		SessionService: sessionService,
+		MemoryService:  memoryService,
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	session, err := sessionService.Create(ctx, &session.CreateRequest{
-		AppName: "coffice agent",
-		UserID:  "user1234",
+		AppName:   "coffice agent",
+		UserID:    "user1234",
+		SessionID: "session1234",
 	})
+
 	if err != nil {
 		log.Fatal(err)
 	}
 	// How much is a latte?
+	err = memoryService.AddSession(ctx, session.Session)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	run(ctx, runner, session.Session.ID(), "一杯拿铁多少钱？")
 
 }

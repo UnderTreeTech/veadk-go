@@ -20,12 +20,13 @@ import (
 	"testing"
 
 	"github.com/volcengine/veadk-go/common"
+	"github.com/volcengine/veadk-go/utils"
 )
 
 func TestClient_DoRequest(t *testing.T) {
 
-	ak := getEnvWithDefault(common.VOLCENGINE_ACCESS_KEY, "")
-	sk := getEnvWithDefault(common.VOLCENGINE_SECRET_KEY, "")
+	ak := utils.GetEnvWithDefault(common.VOLCENGINE_ACCESS_KEY, "")
+	sk := utils.GetEnvWithDefault(common.VOLCENGINE_SECRET_KEY, "")
 
 	body := map[string]any{
 		"Query":       "How to create a LLMAgent?",
@@ -39,7 +40,7 @@ func TestClient_DoRequest(t *testing.T) {
 	//headers := map[string]string{
 	//	"X-Security-Token": "123456",
 	//}
-	client := NewClient()
+	client := NewClient("cn-beijing")
 	result, err := client.DoRequest(ak, sk, nil, bodyBytes)
 	if err != nil {
 		log.Printf("web search client DoRequest error: %v", err)

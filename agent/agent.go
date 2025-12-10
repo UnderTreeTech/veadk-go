@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package llmagent
+package agents
 
 import (
 	"context"
@@ -22,40 +22,26 @@ import (
 	"github.com/volcengine/veadk-go/model"
 	"github.com/volcengine/veadk-go/prompts"
 	"github.com/volcengine/veadk-go/tool/builtin_tools"
-	"google.golang.org/adk/tool"
-
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
+	"google.golang.org/adk/memory"
+	"google.golang.org/adk/session"
+	"google.golang.org/adk/tool"
 )
 
-type InnerConfig struct {
-	Name string
-}
-
-// Config of veLLMAgent
 type Config struct {
 	llmagent.Config
-	ModelName     string
-	ModelProvider string
-	ModelApiBase  string
-	ModelApiKey   string
-	KnowledgeBase *knowledgebase.KnowledgeBase
+	ModelName        string
+	ModelProvider    string
+	ModelAPIBase     string
+	ModelAPIKey      string
+	ModelExtraConfig map[string]any
+	KnowledgeBase    *knowledgebase.KnowledgeBase
+	ShortTermMemory  session.Service
+	LongTermMemory   memory.Service
 }
 
-func New(cfg Config) (agent.Agent, error) {
-	if cfg.ModelName != "" {
-		veModel, err := model.NewModel(
-			context.Background(),
-			cfg.ModelName,
-			&model.ClientConfig{
-				APIKey:  cfg.ModelApiKey,
-				BaseURL: cfg.ModelApiBase,
-			})
-		if err != nil {
-			return nil, err
-		}
-		cfg.Model = veModel
-	}
+func New(cfg *Config) (agent.Agent, error) {
 	if cfg.Name == "" {
 		cfg.Name = common.DEFAULT_LLMAGENT_NAME
 	}
@@ -64,6 +50,20 @@ func New(cfg Config) (agent.Agent, error) {
 	}
 	if cfg.Description == "" {
 		cfg.Description = prompts.DEFAULT_DESCRIPTION
+	}
+
+	if cfg.ModelName != "" {
+		veModel, err := model.NewModel(
+			context.Background(),
+			cfg.ModelName,
+			&model.ClientConfig{
+				APIKey:  cfg.ModelAPIKey,
+				BaseURL: cfg.ModelAPIBase,
+			})
+		if err != nil {
+			return nil, err
+		}
+		cfg.Model = veModel
 	}
 	if cfg.KnowledgeBase != nil {
 		knowledgeTool, err := builtin_tools.LoadKnowledgeBaseTool(cfg.KnowledgeBase)
@@ -75,5 +75,32 @@ func New(cfg Config) (agent.Agent, error) {
 		}
 		cfg.Tools = append(cfg.Tools, knowledgeTool)
 	}
-	return llmagent.New(cfg.Config)
+	llmAgent, err := llmagent.New(cfg.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &veAgent{
+		Agent:                llmAgent,
+		name:                 cfg.Name,
+		description:          cfg.Description,
+		subAgents:            cfg.SubAgents,
+		beforeAgentCallbacks: cfg.BeforeAgentCallbacks,
+		afterAgentCallbacks:  cfg.AfterAgentCallbacks,
+	}, nil
 }
+
+type veAgent struct {
+	agent.Agent
+	name, description    string
+	subAgents            []agent.Agent
+	beforeAgentCallbacks []agent.BeforeAgentCallback
+	afterAgentCallbacks  []agent.AfterAgentCallback
+}
+
+// Run overwrite llmagent run
+//func (va *veAgent) Run(agent.InvocationContext) iter.Seq2[*session.Event, error] {
+//	return func(yield func(*session.Event, error) bool) {
+//		fmt.Println("veAgent Run...")
+//	}
+//}

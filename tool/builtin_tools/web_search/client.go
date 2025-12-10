@@ -29,10 +29,14 @@ import (
 )
 
 const (
-	Path = "/"
+	Path    = "/"
+	Host    = "https://mercury.volcengineapi.com"
+	Service = "volc_torchlight_api"
+	Action  = "WebSearch"
+	Version = "2025-01-01"
 )
 
-type Config struct {
+type Client struct {
 	Host    string
 	Service string
 	Region  string
@@ -40,20 +44,15 @@ type Config struct {
 	Action  string
 	Version string
 }
-type Client struct {
-	config *Config
-}
 
-func NewClient() *Client {
+func NewClient(region string) *Client {
 	return &Client{
-		config: &Config{
-			Host:    "https://mercury.volcengineapi.com",
-			Service: "volc_torchlight_api",
-			Region:  "cn-beijing",
-			Method:  http.MethodPost,
-			Action:  "WebSearch",
-			Version: "2025-01-01",
-		},
+		Host:    Host,
+		Service: Service,
+		Region:  "cn-beijing",
+		Method:  http.MethodPost,
+		Action:  Action,
+		Version: Version,
 	}
 }
 
@@ -61,11 +60,11 @@ func (c *Client) DoRequest(ak, sk string, header map[string]string, body []byte)
 	var result *WebSearchResponse
 
 	queries := make(url.Values)
-	queries.Set("Action", c.config.Action)
-	queries.Set("Version", c.config.Version)
-	requestAddr := fmt.Sprintf("%s%s?%s", c.config.Host, Path, queries.Encode())
+	queries.Set("Action", c.Action)
+	queries.Set("Version", c.Version)
+	requestAddr := fmt.Sprintf("%s%s?%s", c.Host, Path, queries.Encode())
 
-	request, err := http.NewRequest(c.config.Method, requestAddr, bytes.NewBuffer(body))
+	request, err := http.NewRequest(c.Method, requestAddr, bytes.NewBuffer(body))
 	if err != nil {
 		return result, fmt.Errorf("web search bad request: %w", err)
 	}
@@ -98,7 +97,7 @@ func (c *Client) DoRequest(ak, sk string, header map[string]string, body []byte)
 	headerString := strings.Join(headerList, "\n")
 
 	canonicalString := strings.Join([]string{
-		c.config.Method,
+		c.Method,
 		Path,
 		queryString,
 		headerString + "\n",
@@ -108,7 +107,7 @@ func (c *Client) DoRequest(ak, sk string, header map[string]string, body []byte)
 
 	hashedCanonicalString := hex.EncodeToString(hashSHA256([]byte(canonicalString)))
 
-	credentialScope := authDate + "/" + c.config.Region + "/" + c.config.Service + "/request"
+	credentialScope := authDate + "/" + c.Region + "/" + c.Service + "/request"
 	signString := strings.Join([]string{
 		"HMAC-SHA256",
 		date,
@@ -116,7 +115,7 @@ func (c *Client) DoRequest(ak, sk string, header map[string]string, body []byte)
 		hashedCanonicalString,
 	}, "\n")
 
-	signedKey := getSignedKey(sk, authDate, c.config.Region, c.config.Service)
+	signedKey := getSignedKey(sk, authDate, c.Region, c.Service)
 	signature := hex.EncodeToString(hmacSHA256(signedKey, signString))
 
 	authorization := "HMAC-SHA256" +
@@ -124,7 +123,6 @@ func (c *Client) DoRequest(ak, sk string, header map[string]string, body []byte)
 		", SignedHeaders=" + strings.Join(signedHeaders, ";") +
 		", Signature=" + signature
 	request.Header.Set("Authorization", authorization)
-	log.Printf("authorization: %s\n", authorization)
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {

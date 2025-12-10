@@ -16,14 +16,15 @@ package web_search
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/volcengine/veadk-go/auth/veauth"
 	"github.com/volcengine/veadk-go/common"
+	"github.com/volcengine/veadk-go/configs"
 	"github.com/volcengine/veadk-go/log"
-
+	"github.com/volcengine/veadk-go/utils"
 	"google.golang.org/adk/tool"
 	"google.golang.org/adk/tool/functiontool"
 )
@@ -32,27 +33,17 @@ import (
 
 // WebSearchTool is a built-in tool that is automatically invoked by Agents
 // models to retrieve search results from websites.
-var WebSearchTool tool.Tool
 
-func init() {
-	var err error
-	WebSearchTool, err = functiontool.New(
-		functiontool.Config{
-			Name: "web_search",
-			Description: `Search a query in websites.
-Args:
-	query: The query to search.
-Returns:
-	A list of result documents.`,
-		},
-		WebSearch)
-	if err != nil {
-		panic(err)
-	}
-	log.Info("init WebSearchTool successful")
+var WebSearchConfigErr = errors.New("web search config error")
+
+type Config struct {
+	AK           string
+	SK           string
+	SessionToken string
+	Region       string
 }
 
-type webSearchArgs struct {
+type WebSearchArgs struct {
 	Query string `json:"query" jsonschema:"The query to search"`
 }
 
@@ -60,54 +51,85 @@ type WebSearchResult struct {
 	Result []string `json:"result,omitempty"`
 }
 
-func WebSearch(ctx tool.Context, args webSearchArgs) (WebSearchResult, error) {
-	var ak string
-	var sk string
-	//var sessionToken string
-	var out = WebSearchResult{Result: make([]string, 0)}
-
-	if ctx != nil {
-		ak = getStringFromToolContext(ctx, common.VOLCENGINE_ACCESS_KEY)
-		sk = getStringFromToolContext(ctx, common.VOLCENGINE_SECRET_KEY)
+func NewWebSearchTool(cfg *Config) (tool.Tool, error) {
+	if cfg == nil {
+		cfg = &Config{}
+	}
+	if cfg.AK == "" {
+		cfg.AK = utils.GetEnvWithDefault(common.VOLCENGINE_ACCESS_KEY, configs.GetGlobalConfig().Volcengine.AK)
+	}
+	if cfg.SK == "" {
+		cfg.SK = utils.GetEnvWithDefault(common.VOLCENGINE_SECRET_KEY, configs.GetGlobalConfig().Volcengine.SK)
+	}
+	if cfg.AK == "" || cfg.SK == "" {
+		iam, err := veauth.GetCredentialFromVeFaaSIAM()
+		if err != nil {
+			log.Warn(fmt.Sprintf("%s : GetCredential error: %s", WebSearchConfigErr.Error(), err.Error()))
+		} else {
+			cfg.AK = iam.AccessKeyID
+			cfg.SK = iam.SecretAccessKey
+			cfg.SessionToken = iam.SessionToken
+		}
+	}
+	if cfg.Region == "" {
+		cfg.Region = common.DEFAULT_WEB_SEARCH_REGION
 	}
 
-	if strings.TrimSpace(ak) == "" || strings.TrimSpace(sk) == "" {
-		ak = getEnvWithDefault(common.VOLCENGINE_ACCESS_KEY, "")
-		sk = getEnvWithDefault(common.VOLCENGINE_SECRET_KEY, "")
-	}
+	handler := func(ctx tool.Context, args WebSearchArgs) (WebSearchResult, error) {
+		var ak string
+		var sk string
+		var header map[string]string
+		//var sessionToken string
+		var out = WebSearchResult{Result: make([]string, 0)}
 
-	if strings.TrimSpace(ak) == "" || strings.TrimSpace(sk) == "" {
-		cred, err := veauth.GetCredentialFromVeFaaSIAM()
+		if ctx != nil {
+			ak = getStringFromToolContext(ctx, common.VOLCENGINE_ACCESS_KEY)
+			sk = getStringFromToolContext(ctx, common.VOLCENGINE_SECRET_KEY)
+		}
+
+		if strings.TrimSpace(ak) == "" || strings.TrimSpace(sk) == "" {
+			ak = cfg.AK
+			sk = cfg.SK
+		}
+
+		if cfg.SessionToken != "" {
+			header = map[string]string{"X-Security-Token": cfg.SessionToken}
+		}
+
+		body := map[string]any{
+			"Query":       args.Query,
+			"SearchType":  "web",
+			"Count":       5,
+			"NeedSummary": true,
+		}
+
+		bodyBytes, _ := json.Marshal(body)
+
+		webSearchClient := NewClient(cfg.Region)
+		resp, err := webSearchClient.DoRequest(ak, sk, header, bodyBytes)
 		if err != nil {
 			return out, err
 		}
-		ak = cred.AccessKeyID
-		sk = cred.SecretAccessKey
-		//sessionToken = cred.SessionToken
-	}
-	//header := map[string]string{"X-Security-Token": sessionToken}
-	body := map[string]any{
-		"Query":       args.Query,
-		"SearchType":  "web",
-		"Count":       5,
-		"NeedSummary": true,
+		if len(resp.Result.WebResults) <= 0 {
+			return out, fmt.Errorf("web search result is empty")
+		}
+		for _, item := range resp.Result.WebResults {
+			out.Result = append(out.Result, item.Summary)
+		}
+
+		return out, nil
 	}
 
-	bodyBytes, _ := json.Marshal(body)
-
-	webSearchClient := NewClient()
-	resp, err := webSearchClient.DoRequest(ak, sk, nil, bodyBytes)
-	if err != nil {
-		return out, err
-	}
-	if len(resp.Result.WebResults) <= 0 {
-		return out, fmt.Errorf("web search result is empty")
-	}
-	for _, item := range resp.Result.WebResults {
-		out.Result = append(out.Result, item.Summary)
-	}
-
-	return out, nil
+	return functiontool.New(
+		functiontool.Config{
+			Name: "web_search",
+			Description: `A tool to retrieve information from the websites.
+Args:
+	query: The query to search.
+Returns:
+	A list of result documents.`,
+		},
+		handler)
 }
 
 func getStringFromToolContext(toolContext tool.Context, key string) string {
@@ -121,12 +143,4 @@ func getStringFromToolContext(toolContext tool.Context, key string) string {
 		return value
 	}
 	return value
-}
-
-func getEnvWithDefault(key, defaultValue string) string {
-	val, exists := os.LookupEnv(key)
-	if !exists || strings.TrimSpace(val) == "" {
-		return defaultValue
-	}
-	return val
 }

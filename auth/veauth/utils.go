@@ -28,8 +28,12 @@ type VeIAMCredential struct {
 	SessionToken    string `json:"session_token"`
 }
 
-func GetCredentialFromVeFaaSIAM() (VeIAMCredential, error) {
-	b, err := os.ReadFile(common.VEFAAS_IAM_CRIDENTIAL_PATH)
+func GetCredentialFromVeFaaSIAM(paths ...string) (VeIAMCredential, error) {
+	path := common.VEFAAS_IAM_CRIDENTIAL_PATH
+	if len(paths) > 0 {
+		path = paths[0]
+	}
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return VeIAMCredential{}, err
 	}

@@ -12,37 +12,50 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package llmagent
+package main
 
 import (
 	"context"
 	"fmt"
 	"log"
 	"os"
-	"testing"
 
+	veagent "github.com/volcengine/veadk-go/agent"
 	"github.com/volcengine/veadk-go/common"
-
+	"github.com/volcengine/veadk-go/tool/builtin_tools/web_search"
+	"github.com/volcengine/veadk-go/utils"
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/cmd/launcher"
 	"google.golang.org/adk/cmd/launcher/full"
+	"google.golang.org/adk/session"
+	"google.golang.org/adk/tool"
 )
 
-func TestNewLLMAgent(t *testing.T) {
+func main() {
 	ctx := context.Background()
-	fmt.Println(os.Getenv("MODEL_API_KEY"))
-	cfg := Config{
+	cfg := &veagent.Config{
 		ModelName:    common.DEFAULT_MODEL_AGENT_NAME,
-		ModelApiBase: common.DEFAULT_MODEL_AGENT_API_BASE,
-		ModelApiKey:  os.Getenv("MODEL_API_KEY"),
+		ModelAPIBase: common.DEFAULT_MODEL_AGENT_API_BASE,
+		ModelAPIKey:  utils.GetEnvWithDefault(common.MODEL_AGENT_API_KEY),
 	}
-	a, err := New(cfg)
+
+	webSearch, err := web_search.NewWebSearchTool(&web_search.Config{})
 	if err != nil {
-		t.Fatalf("NewLLMAgent failed: %v", err)
+		fmt.Printf("NewLLMAgent failed: %v", err)
+		return
+	}
+
+	cfg.Tools = []tool.Tool{webSearch}
+
+	a, err := veagent.New(cfg)
+	if err != nil {
+		fmt.Printf("NewLLMAgent failed: %v", err)
+		return
 	}
 
 	config := &launcher.Config{
-		AgentLoader: agent.NewSingleLoader(a),
+		AgentLoader:    agent.NewSingleLoader(a),
+		SessionService: session.InMemoryService(),
 	}
 
 	l := full.NewLauncher()
@@ -50,7 +63,4 @@ func TestNewLLMAgent(t *testing.T) {
 		log.Fatalf("Run failed: %v\n\n%s", err, l.CommandLineSyntax())
 	}
 
-	//fmt.Println(a.Name())
-	//fmt.Println(a.Description())
-	//time.Sleep(1 * time.Second)
 }

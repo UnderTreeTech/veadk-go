@@ -4,7 +4,8 @@
 *.dll
 *.so
 *.dylib
-*.source
+.env
+.credential
 
 # Test binary, built with `go test -c`
 *.test
@@ -19,5 +20,5 @@
 go.work
 
 .idea/
-agents/.env
+agent/.env
 agents/config.yaml

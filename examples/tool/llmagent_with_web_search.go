@@ -20,11 +20,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/volcengine/veadk-go/agents/llmagent"
+	veagent "github.com/volcengine/veadk-go/agent"
 	"github.com/volcengine/veadk-go/common"
-	"github.com/volcengine/veadk-go/prompts"
 	"github.com/volcengine/veadk-go/tool/builtin_tools/web_search"
-
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/runner"
 	"google.golang.org/adk/session"
@@ -34,18 +32,21 @@ import (
 
 func main() {
 	ctx := context.Background()
-	cfg := llmagent.Config{
+	cfg := veagent.Config{
 		ModelName:    common.DEFAULT_MODEL_AGENT_NAME,
-		ModelApiBase: common.DEFAULT_MODEL_AGENT_API_BASE,
-		ModelApiKey:  os.Getenv("MODEL_API_KEY"),
+		ModelAPIBase: common.DEFAULT_MODEL_AGENT_API_BASE,
+		ModelAPIKey:  os.Getenv("MODEL_API_KEY"),
 	}
-	cfg.Name = "veadk-llmagent"
-	cfg.Instruction = prompts.DEFAULT_INSTRUCTION
-	cfg.Description = prompts.DEFAULT_DESCRIPTION
 
-	cfg.Tools = []tool.Tool{web_search.WebSearchTool}
+	webSearch, err := web_search.NewWebSearchTool(&web_search.Config{})
+	if err != nil {
+		fmt.Printf("NewLLMAgent failed: %v", err)
+		return
+	}
 
-	a, err := llmagent.New(cfg)
+	cfg.Tools = []tool.Tool{webSearch}
+
+	a, err := veagent.New(&cfg)
 	if err != nil {
 		fmt.Printf("NewLLMAgent failed: %v", err)
 		return

@@ -25,7 +25,7 @@ const (
 	DEFAULT_LOGGING_LEVER = "info"
 )
 
-const DEFAULT_LLMAGENT_NAME = "veLLMAgent"
+const DEFAULT_LLMAGENT_NAME = "veAgent"
 
 const VEFAAS_IAM_CRIDENTIAL_PATH = "/var/run/secrets/iam/credential"
 
@@ -44,5 +44,11 @@ const (
 // TOS
 const (
 	DEFAULT_DATABASE_TOS_REGION = "cn-beijing"
-	DEFAULT_DATABASE_TOS_BUCKET = "veADK-go"
+	DEFAULT_DATABASE_TOS_BUCKET = "ark-tutorial"
+)
+
+//web_search
+
+const (
+	DEFAULT_WEB_SEARCH_REGION = "cn-beijing"
 )

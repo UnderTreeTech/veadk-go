@@ -12,21 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package web_search
-
-import (
-	"fmt"
-	"testing"
-)
-
-func TestWebSearch(t *testing.T) {
-	query := "How to create a LLMAgent?"
-	result, err := WebSearch(nil, webSearchArgs{
-		Query: query,
-	})
-	if err != nil {
-		fmt.Printf("WebSearch error: %v", err)
-		return
-	}
-	fmt.Println("result:", result)
-}
+package agents
