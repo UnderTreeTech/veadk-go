@@ -15,9 +15,9 @@
 package viking_memory
 
 type CollectionInfoRequest struct {
-	CollectionName string `json:"collection_name"`
-	ProjectName    string `json:"project_name"`
-	ResourceId     string `json:"resource_id"`
+	CollectionName string
+	ProjectName    string
+	ResourceId     string
 }
 
 type CollectionCreateRequest struct {
