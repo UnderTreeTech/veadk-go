@@ -20,7 +20,7 @@ import (
 	"log"
 	"strings"
 
-	veagent "github.com/volcengine/veadk-go/agent"
+	veagent "github.com/volcengine/veadk-go/agent/llmagent"
 	"github.com/volcengine/veadk-go/common"
 	vem "github.com/volcengine/veadk-go/memory"
 	"github.com/volcengine/veadk-go/utils"
@@ -87,6 +87,7 @@ func main() {
 		log.Printf("NewShortTermMemoryService failed: %v", err)
 		return
 	}
+	//sessionService := session.InMemoryService()
 	memoryService, err := vem.NewLongTermMemoryService(vem.BackendLongTermViking, nil)
 	if err != nil {
 		log.Printf("NewLongTermMemoryService failed: %v", err)

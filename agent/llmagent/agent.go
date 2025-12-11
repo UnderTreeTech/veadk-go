@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package agents
+package llmagent
 
 import (
 	"context"
@@ -24,8 +24,6 @@ import (
 	"github.com/volcengine/veadk-go/tool/builtin_tools"
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
-	"google.golang.org/adk/memory"
-	"google.golang.org/adk/session"
 	"google.golang.org/adk/tool"
 )
 
@@ -37,8 +35,6 @@ type Config struct {
 	ModelAPIKey      string
 	ModelExtraConfig map[string]any
 	KnowledgeBase    *knowledgebase.KnowledgeBase
-	ShortTermMemory  session.Service
-	LongTermMemory   memory.Service
 }
 
 func New(cfg *Config) (agent.Agent, error) {
@@ -81,21 +77,14 @@ func New(cfg *Config) (agent.Agent, error) {
 	}
 
 	return &veAgent{
-		Agent:                llmAgent,
-		name:                 cfg.Name,
-		description:          cfg.Description,
-		subAgents:            cfg.SubAgents,
-		beforeAgentCallbacks: cfg.BeforeAgentCallbacks,
-		afterAgentCallbacks:  cfg.AfterAgentCallbacks,
+		Agent:  llmAgent,
+		config: cfg,
 	}, nil
 }
 
 type veAgent struct {
 	agent.Agent
-	name, description    string
-	subAgents            []agent.Agent
-	beforeAgentCallbacks []agent.BeforeAgentCallback
-	afterAgentCallbacks  []agent.AfterAgentCallback
+	config *Config
 }
 
 // Run overwrite llmagent run

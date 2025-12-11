@@ -12,6 +12,7 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+*.yaml
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -21,4 +22,4 @@ go.work
 
 .idea/
 agent/.env
-agents/config.yaml
+examples/quickstart/config.yaml

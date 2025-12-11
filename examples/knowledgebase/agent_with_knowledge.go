@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"log"
 
-	veagent "github.com/volcengine/veadk-go/agent"
+	veagent "github.com/volcengine/veadk-go/agent/llmagent"
 	"github.com/volcengine/veadk-go/common"
 	"github.com/volcengine/veadk-go/integrations/ve_tos"
 	"github.com/volcengine/veadk-go/knowledgebase"

@@ -73,9 +73,11 @@ func TestBucketExist_NotFound(t *testing.T) {
 }
 
 func TestCreateAndDeleteBucket(t *testing.T) {
-	bucket := uniqueBucket()
-	c := getClientOrSkip(t, bucket)
-	t.Log("creating bucket:", bucket)
+	c := getClientOrSkip(t)
+
+	if ok, err := c.BucketExist(t.Context()); ok && err == nil {
+		t.Skip("BucketExist skip")
+	}
 
 	if err := c.CreateBucket(t.Context()); err != nil {
 		t.Fatalf("CreateBucket error: %v", err)
@@ -88,7 +90,7 @@ func TestCreateAndDeleteBucket(t *testing.T) {
 		t.Fatalf("BucketExist after create returned error: %v", err)
 	}
 	if !exist {
-		t.Fatalf("expected bucket exist after create, got not exist: %s", bucket)
+		t.Fatalf("expected bucket exist after create, got not exist: %s", c.config.Bucket)
 	}
 
 	if err := c.DeleteBucket(t.Context()); err != nil {
@@ -106,7 +108,7 @@ func TestCreateAndDeleteBucket(t *testing.T) {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	t.Fatalf("expected bucket not exist after delete, still exists: %s", bucket)
+	t.Fatalf("expected bucket not exist after delete, still exists: %s", c.config.Bucket)
 }
 
 func TestUploadTextAndDownload(t *testing.T) {
