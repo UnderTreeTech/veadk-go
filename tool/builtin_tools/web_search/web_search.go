@@ -29,9 +29,9 @@ import (
 	"google.golang.org/adk/tool/functiontool"
 )
 
-//The document of this tool see: https://www.volcengine.com/docs/85508/1650263
+//The document of this tools see: https://www.volcengine.com/docs/85508/1650263
 
-// WebSearchTool is a built-in tool that is automatically invoked by Agents
+// WebSearchTool is a built-in tools that is automatically invoked by Agents
 // models to retrieve search results from websites.
 
 var WebSearchConfigErr = errors.New("web search config error")
@@ -123,7 +123,7 @@ func NewWebSearchTool(cfg *Config) (tool.Tool, error) {
 	return functiontool.New(
 		functiontool.Config{
 			Name: "web_search",
-			Description: `A tool to retrieve information from the websites.
+			Description: `A tools to retrieve information from the websites.
 Args:
 	query: The query to search.
 Returns:

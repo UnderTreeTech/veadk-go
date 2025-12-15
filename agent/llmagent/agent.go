@@ -18,10 +18,12 @@ import (
 	"context"
 
 	"github.com/volcengine/veadk-go/common"
+	"github.com/volcengine/veadk-go/configs"
 	"github.com/volcengine/veadk-go/knowledgebase"
 	"github.com/volcengine/veadk-go/model"
 	"github.com/volcengine/veadk-go/prompts"
 	"github.com/volcengine/veadk-go/tool/builtin_tools"
+	"github.com/volcengine/veadk-go/utils"
 	"google.golang.org/adk/agent"
 	"google.golang.org/adk/agent/llmagent"
 	"google.golang.org/adk/tool"
@@ -48,13 +50,23 @@ func New(cfg *Config) (agent.Agent, error) {
 		cfg.Description = prompts.DEFAULT_DESCRIPTION
 	}
 
-	if cfg.ModelName != "" {
+	if cfg.Model == nil {
+		if cfg.ModelName == "" {
+			cfg.ModelName = utils.GetEnvWithDefault(common.MODEL_AGENT_NAME, configs.GetGlobalConfig().Model.Agent.Name, common.DEFAULT_MODEL_AGENT_NAME)
+		}
+		if cfg.ModelAPIKey == "" {
+			cfg.ModelAPIKey = utils.GetEnvWithDefault(common.MODEL_AGENT_API_KEY, configs.GetGlobalConfig().Model.Agent.ApiKey)
+		}
+		if cfg.ModelAPIBase == "" {
+			cfg.ModelAPIBase = utils.GetEnvWithDefault(common.MODEL_AGENT_API_BASE, configs.GetGlobalConfig().Model.Agent.ApiBase, common.DEFAULT_MODEL_AGENT_API_BASE)
+		}
 		veModel, err := model.NewModel(
 			context.Background(),
 			cfg.ModelName,
 			&model.ClientConfig{
-				APIKey:  cfg.ModelAPIKey,
-				BaseURL: cfg.ModelAPIBase,
+				APIKey:    cfg.ModelAPIKey,
+				BaseURL:   cfg.ModelAPIBase,
+				ExtraBody: cfg.ModelExtraConfig,
 			})
 		if err != nil {
 			return nil, err

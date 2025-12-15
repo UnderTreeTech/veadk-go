@@ -28,7 +28,7 @@ import (
 type VeADKConfig struct {
 	Volcengine  *Volcengine         `yaml:"volcengine"`
 	Model       *ModelConfig        `yaml:"model"`
-	Tool        *BuiltinToolConfigs `yaml:"tool"`
+	Tool        *BuiltinToolConfigs `yaml:"tools"`
 	PromptPilot *PromptPilotConfig  `yaml:"prompt_pilot"`
 	TlsConfig   *TLSConfig          `yaml:"tls_config"`
 	Veidentity  *VeIdentityConfig   `yaml:"veidentity"`

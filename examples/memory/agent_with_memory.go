@@ -38,7 +38,7 @@ func main() {
 	appName := "ve_agent"
 	userID := "user1111"
 
-	// Define a tool that can search memory.
+	// Define a tools that can search memory.
 	memorySearchTool, err := functiontool.New(
 		functiontool.Config{
 			Name:        "search_past_conversations",
@@ -71,7 +71,7 @@ func main() {
 		ModelAPIKey:  utils.GetEnvWithDefault(common.MODEL_AGENT_API_KEY),
 	}
 	cfg.Name = "MemoryRecallAgent"
-	cfg.Instruction = "Answer the user's question. Use the 'search_past_conversations' tool if the answer might be in past conversations."
+	cfg.Instruction = "Answer the user's question. Use the 'search_past_conversations' tools if the answer might be in past conversations."
 
 	cfg.Tools = []tool.Tool{memorySearchTool}
 
@@ -175,17 +175,17 @@ func main() {
 
 }
 
-// Args defines the input structure for the memory search tool.
+// Args defines the input structure for the memory search tools.
 type Args struct {
 	Query string `json:"query" jsonschema:"The query to search for in the memory."`
 }
 
-// Result defines the output structure for the memory search tool.
+// Result defines the output structure for the memory search tools.
 type Result struct {
 	Results []string `json:"results"`
 }
 
-// memorySearchToolFunc is the implementation of the memory search tool.
+// memorySearchToolFunc is the implementation of the memory search tools.
 // This function demonstrates accessing memory via tool.Context.
 func memorySearchToolFunc(tctx tool.Context, args Args) (Result, error) {
 	fmt.Printf("Tool: Searching memory for query: '%s'\n", args.Query)

@@ -22,7 +22,7 @@ import (
 )
 
 type QueryKnowledgeReq struct {
-	Query string `json:"query" jsonschema:"The query for loading the knowledge base for this tool"`
+	Query string `json:"query" jsonschema:"The query for loading the knowledge base for this tools"`
 }
 
 type KnowledgeBaseResult struct {
@@ -30,7 +30,7 @@ type KnowledgeBaseResult struct {
 }
 
 // LoadKnowledgeBaseTool
-// Loads the knowledgebase tool from a backend.
+// Loads the knowledgebase tools from a backend.
 // Args:
 // query: The query to load the knowledgebase for.
 // Returns:

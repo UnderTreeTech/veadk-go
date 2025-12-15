@@ -25,7 +25,8 @@ type ClientConfig struct {
 	APIKey string
 	// BaseURL is the base URL for the API (e.g., "https://api.example.com/v1").
 	// If empty, will be inferred from the model name.
-	BaseURL string
+	BaseURL   string
+	ExtraBody map[string]any
 	// HTTPClient is the HTTP client to use (optional)
 	HTTPClient *http.Client
 }
@@ -97,6 +98,9 @@ func (m *openAIModel) GenerateContent(ctx context.Context, req *model.LLMRequest
 			yield(nil, fmt.Errorf("failed to convert request: %w", err))
 		}
 	}
+	if extraBody, ok := m.config.ExtraBody["extra_body"]; ok {
+		openaiReq.ExtraBody = extraBody.(map[string]any)
+	}
 
 	if stream {
 		return m.generateStream(ctx, openaiReq)
@@ -115,6 +119,45 @@ type openAIRequest struct {
 	Stop           []string              `json:"stop,omitempty"`
 	Stream         bool                  `json:"stream,omitempty"`
 	ResponseFormat *openAIResponseFormat `json:"response_format,omitempty"`
+	ExtraBody      map[string]any
+}
+
+func (r openAIRequest) MarshalJSON() ([]byte, error) {
+	topLevel := make(map[string]interface{})
+
+	topLevel["model"] = r.Model
+	topLevel["messages"] = r.Messages
+	if len(r.Tools) > 0 {
+		topLevel["tools"] = r.Tools
+	}
+	if r.Temperature != nil {
+		topLevel["temperature"] = *r.Temperature
+	}
+	if r.MaxTokens != nil {
+		topLevel["max_tokens"] = *r.MaxTokens
+	}
+	if r.TopP != nil {
+		topLevel["top_p"] = *r.TopP
+	}
+	if len(r.Stop) > 0 {
+		topLevel["stop"] = r.Stop
+	}
+	if r.Stream {
+		topLevel["stream"] = r.Stream
+	}
+	if r.ResponseFormat != nil {
+		topLevel["response_format"] = r.ResponseFormat
+	}
+
+	// 4. 第三步：合并外部 map（ExtraFields）到顶层，同名 key 会覆盖结构体字段
+	if r.ExtraBody != nil {
+		for k, v := range r.ExtraBody {
+			topLevel[k] = v // 外部 map 优先：若 key 相同，外部值覆盖结构体字段
+		}
+	}
+
+	// 5. 序列化顶层 map 为 JSON（带缩进，便于调试）
+	return json.MarshalIndent(topLevel, "", "  ")
 }
 
 type openAIResponseFormat struct {
@@ -122,7 +165,7 @@ type openAIResponseFormat struct {
 }
 
 type openAIMessage struct {
-	Role             string           `json:"role"` // system, user, assistant, tool
+	Role             string           `json:"role"` // system, user, assistant, tools
 	Content          any              `json:"content,omitempty"`
 	ToolCalls        []openAIToolCall `json:"tool_calls,omitempty"`
 	ToolCallID       string           `json:"tool_call_id,omitempty"`
@@ -253,7 +296,7 @@ func (m *openAIModel) convertContent(content *genai.Content) ([]openAIMessage, e
 		role = "assistant"
 	}
 
-	// Check if this is a tool response
+	// Check if this is a tools response
 	var toolMessages []openAIMessage
 	for _, part := range content.Parts {
 		if part.FunctionResponse != nil {
@@ -266,7 +309,7 @@ func (m *openAIModel) convertContent(content *genai.Content) ([]openAIMessage, e
 				toolCallID = "call_" + uuid.New().String()[:8]
 			}
 			toolMessages = append(toolMessages, openAIMessage{
-				Role:       "tool",
+				Role:       "tools",
 				Content:    string(responseJSON),
 				ToolCallID: toolCallID,
 			})
@@ -387,7 +430,7 @@ func extractTextFromContent(content *genai.Content) string {
 	return strings.Join(texts, "\n")
 }
 
-// convertFunctionDeclaration converts a genai.FunctionDeclaration to OpenAI tool format.
+// convertFunctionDeclaration converts a genai.FunctionDeclaration to OpenAI tools format.
 func convertFunctionDeclaration(fn *genai.FunctionDeclaration) openAITool {
 	params := convertFunctionParameters(fn)
 
@@ -568,7 +611,7 @@ func (m *openAIModel) generateStream(ctx context.Context, openaiReq *openAIReque
 				}
 			}
 
-			// Handle tool calls
+			// Handle tools calls
 			if len(delta.ToolCalls) > 0 {
 				for idx, tc := range delta.ToolCalls {
 					targetIdx := idx
@@ -622,7 +665,7 @@ func (m *openAIModel) generateStream(ctx context.Context, openaiReq *openAIReque
 // sendRequest creates and sends an HTTP request to the OpenAI API.
 // Caller is responsible for closing the response body.
 func (m *openAIModel) sendRequest(ctx context.Context, openaiReq *openAIRequest) (*http.Response, error) {
-	reqBody, err := json.Marshal(openaiReq)
+	reqBody, err := openaiReq.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
@@ -635,7 +678,8 @@ func (m *openAIModel) sendRequest(ctx context.Context, openaiReq *openAIRequest)
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+m.config.APIKey)
-
+	//bodyStr, _ := json.Marshal(map[string]any{"thinking": map[string]string{"type": "disabled"}})
+	//httpReq.Header.Set("extra_body", string(bodyStr))
 	httpResp, err := m.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
@@ -685,7 +729,7 @@ func (m *openAIModel) convertResponse(resp *openAIResponse) (*model.LLMResponse,
 		parts = append(parts, reasoningParts...)
 	}
 
-	// Get tool calls - either from structured response or parsed from text
+	// Get tools calls - either from structured response or parsed from text
 	toolCalls := msg.ToolCalls
 	textContent := ""
 	if msg.Content != nil {
@@ -694,7 +738,7 @@ func (m *openAIModel) convertResponse(resp *openAIResponse) (*model.LLMResponse,
 		}
 	}
 
-	// If no structured tool calls, try parsing from text content
+	// If no structured tools calls, try parsing from text content
 	if len(toolCalls) == 0 && textContent != "" {
 		parsedCalls, remainder := parseToolCallsFromText(textContent)
 		if len(parsedCalls) > 0 {
@@ -708,14 +752,14 @@ func (m *openAIModel) convertResponse(resp *openAIResponse) (*model.LLMResponse,
 		parts = append(parts, genai.NewPartFromText(textContent))
 	}
 
-	// Handle tool calls
+	// Handle tools calls
 	for _, tc := range toolCalls {
 		if tc.ID == "" && tc.Function.Name == "" && tc.Function.Arguments == "" {
 			continue
 		}
 		var args map[string]any
 		if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal tool arguments: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal tools arguments: %w", err)
 		}
 		part := genai.NewPartFromFunctionCall(tc.Function.Name, args)
 		part.FunctionCall.ID = tc.ID
@@ -824,9 +868,9 @@ func extractTexts(value any, parts *[]*genai.Part) {
 	}
 }
 
-// parseToolCallsFromText extracts inline JSON tool calls from text responses.
-// Some models embed tool calls as JSON objects in their text output.
-// Returns the extracted tool calls and any remaining text.
+// parseToolCallsFromText extracts inline JSON tools calls from text responses.
+// Some models embed tools calls as JSON objects in their text output.
+// Returns the extracted tools calls and any remaining text.
 func parseToolCallsFromText(text string) ([]openAIToolCall, string) {
 	if text == "" {
 		return nil, ""
@@ -858,7 +902,7 @@ func parseToolCallsFromText(text string) ([]openAIToolCall, string) {
 		// Calculate end position
 		endPos := braceIndex + int(decoder.InputOffset())
 
-		// Check if this looks like a tool call
+		// Check if this looks like a tools call
 		name, hasName := candidate["name"].(string)
 		args, hasArgs := candidate["arguments"]
 		if hasName && hasArgs {
@@ -895,7 +939,7 @@ func parseToolCallsFromText(text string) ([]openAIToolCall, string) {
 }
 
 // mapFinishReason maps OpenAI finish_reason strings to genai.FinishReason values.
-// Note: tool_calls and function_call map to STOP because tool calls represent
+// Note: tool_calls and function_call map to STOP because tools calls represent
 // normal completion where the model stopped to invoke tools.
 func mapFinishReason(reason string) genai.FinishReason {
 	switch reason {
