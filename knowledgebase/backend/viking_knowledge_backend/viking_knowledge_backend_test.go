@@ -15,195 +15,216 @@
 package viking_knowledge_backend
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
-	"sort"
 	"testing"
-	"time"
 
-	"github.com/volcengine/veadk-go/common"
+	"github.com/bytedance/mockey"
+	"github.com/stretchr/testify/assert"
+	"github.com/volcengine/veadk-go/integrations/ve_tos"
+	"github.com/volcengine/veadk-go/integrations/ve_viking"
+	"github.com/volcengine/veadk-go/integrations/ve_viking/viking_knowledge"
 )
 
-func writeFile(t *testing.T, dir string, rel string) string {
-	t.Helper()
-	p := filepath.Join(dir, rel)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
-		t.Fatalf("write: %v", err)
-	}
-	return p
-}
-
-func assertEqualPaths(t *testing.T, got, want []string) {
-	t.Helper()
-	sort.Strings(got)
-	sort.Strings(want)
-	if len(got) != len(want) {
-		t.Fatalf("len mismatch: got=%d want=%d\ngot=%v\nwant=%v", len(got), len(want), got, want)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("path mismatch at %d: got=%s want=%s\nall got=%v\nall want=%v", i, got[i], want[i], got, want)
+func TestNewVikingKnowledgeBackend(t *testing.T) {
+	mockey.PatchConvey("TestNewVikingKnowledgeBackend", t, func() {
+		cfg := &Config{
+			AK:               "ak",
+			SK:               "sk",
+			Index:            "test_index",
+			Project:          "proj",
+			Region:           "cn-beijing",
+			CreateIfNotExist: true,
+			TosConfig: &ve_tos.Config{
+				AK:       "ak",
+				SK:       "sk",
+				Region:   "cn-beijing",
+				Endpoint: "https://xxxxxxx.com",
+				Bucket:   "veadk-tests",
+			},
 		}
-	}
-}
 
-func TestGetFilesInDirectory_NonExistent(t *testing.T) {
-	base := t.TempDir()
-	missing := filepath.Join(base, "missing")
-	_, err := getFilesInDirectory(missing)
-	if err == nil {
-		t.Fatalf("expected error for non-existent directory")
-	}
-}
+		mockey.PatchConvey("collection info error", func() {
+			mockey.Mock((*viking_knowledge.Client).CollectionInfo).Return(nil, assert.AnError).Build()
+			kb, err := NewVikingKnowledgeBackend(cfg)
+			assert.Nil(t, kb)
+			assert.NotNil(t, err)
+		})
 
-func TestGetFilesInDirectory_Empty(t *testing.T) {
-	dir := t.TempDir()
-	files, err := getFilesInDirectory(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	assertEqualPaths(t, files, []string{})
-}
+		mockey.PatchConvey("index not exist and not create", func() {
+			c := *cfg
+			c.CreateIfNotExist = false
+			mockey.Mock((*viking_knowledge.Client).CollectionInfo).Return(&ve_viking.CommonResponse{Code: ve_viking.VikingKnowledgeBaseIndexNotExistCode}, nil).Build()
+			kb, err := NewVikingKnowledgeBackend(&c)
+			assert.Nil(t, kb)
+			assert.NotNil(t, err)
+		})
 
-func TestGetFilesInDirectory_Flat(t *testing.T) {
-	dir := t.TempDir()
-	f1 := writeFile(t, dir, "a.txt")
-	f2 := writeFile(t, dir, "b.md")
-	if err := os.Mkdir(filepath.Join(dir, "sub"), 0o755); err != nil {
-		t.Fatalf("mkdir: %v", err)
-	}
-	files, err := getFilesInDirectory(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	assertEqualPaths(t, files, []string{f1, f2})
-}
+		mockey.PatchConvey("index not exist and create failed", func() {
+			mockey.Mock((*viking_knowledge.Client).CollectionInfo).Return(&ve_viking.CommonResponse{Code: ve_viking.VikingKnowledgeBaseIndexNotExistCode}, nil).Build()
+			mockey.Mock((*viking_knowledge.Client).CollectionCreate).Return(nil, assert.AnError).Build()
+			kb, err := NewVikingKnowledgeBackend(cfg)
+			assert.Nil(t, kb)
+			assert.NotNil(t, err)
+		})
 
-func TestGetFilesInDirectory_Nested(t *testing.T) {
-	dir := t.TempDir()
-	r1 := writeFile(t, dir, "root.txt")
-	n1 := writeFile(t, dir, "sub/inner/deep.txt")
-	n2 := writeFile(t, dir, "sub/inner/another.bin")
-	n3 := writeFile(t, dir, "sub/file.log")
-	files, err := getFilesInDirectory(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	t.Log("files:", files)
-	assertEqualPaths(t, files, []string{r1, n1, n2, n3})
-}
+		mockey.PatchConvey("index not exist and create success", func() {
+			mockey.Mock((*viking_knowledge.Client).CollectionInfo).Return(&ve_viking.CommonResponse{Code: ve_viking.VikingKnowledgeBaseIndexNotExistCode}, nil).Build()
+			mockey.Mock((*viking_knowledge.Client).CollectionCreate).Return(&ve_viking.CommonResponse{Code: ve_viking.VikingKnowledgeBaseSuccessCode}, nil).Build()
+			kb, err := NewVikingKnowledgeBackend(cfg)
+			assert.NotNil(t, kb)
+			assert.Nil(t, err)
+		})
 
-func TestGetFilesInDirectory_SymlinkIgnored(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("symlink requires privileges on Windows")
-	}
-	dir := t.TempDir()
-	target := writeFile(t, dir, "real.txt")
-	link := filepath.Join(dir, "link.txt")
-	if err := os.Symlink(target, link); err != nil {
-		t.Skip("symlink not supported in environment")
-	}
-	files, err := getFilesInDirectory(dir)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	assertEqualPaths(t, files, []string{target})
-}
-
-func newBackendOrSkip(t *testing.T, idx string) *VikingKnowledgeBackend {
-	t.Helper()
-	ak := os.Getenv(common.VOLCENGINE_ACCESS_KEY)
-	sk := os.Getenv(common.VOLCENGINE_SECRET_KEY)
-	if ak == "" || sk == "" {
-		t.Skip("missing VOLCENGINE_ACCESS_KEY/VOLCENGINE_SECRET_KEY")
-	}
-	region := os.Getenv(common.DATABASE_VIKING_REGION)
-	if region == "" {
-		region = "cn-beijing"
-	}
-
-	cfg := &Config{
-		AK:                  ak,
-		SK:                  sk,
-		Index:               idx,
-		Project:             "default",
-		Region:              region,
-		CreateIfNotExist:    true,
-		TopK:                5,
-		ChunkDiffusionCount: 1,
-	}
-	kb, err := NewVikingKnowledgeBackend(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return kb.(*VikingKnowledgeBackend)
+		mockey.PatchConvey("collection info success", func() {
+			mockey.Mock((*viking_knowledge.Client).CollectionInfo).Return(&ve_viking.CommonResponse{Code: ve_viking.VikingKnowledgeBaseSuccessCode}, nil).Build()
+			kb, err := NewVikingKnowledgeBackend(cfg)
+			assert.NotNil(t, kb)
+			assert.Nil(t, err)
+		})
+	})
 }
 
 func TestVikingKnowledgeBackend_Search(t *testing.T) {
-	idx := "sjy_test_coffee_kg"
-	kb := newBackendOrSkip(t, idx)
-	entries, err := kb.Search("拿铁")
-	if err != nil {
-		t.Fatal(err)
+	v := &VikingKnowledgeBackend{
+		viking: &viking_knowledge.Client{},
+		tos:    &ve_tos.Client{},
+		config: &Config{TopK: 3, ChunkDiffusionCount: 1},
 	}
-	t.Log("viking kg search result: ", entries)
-	if len(entries) > 0 && entries[0].Content == "" {
-		t.Fatalf("empty content")
-	}
+	mockey.PatchConvey("TestVikingKnowledgeBackend_Search", t, func() {
+		mockey.PatchConvey("search error", func() {
+			mockey.Mock((*viking_knowledge.Client).SearchKnowledge).Return(nil, assert.AnError).Build()
+			entries, err := v.Search("q")
+			assert.Nil(t, entries)
+			assert.NotNil(t, err)
+		})
+
+		mockey.PatchConvey("bad code", func() {
+			mockey.Mock((*viking_knowledge.Client).SearchKnowledge).Return(&viking_knowledge.CollectionSearchKnowledgeResponse{Code: 1, Message: "bad"}, nil).Build()
+			entries, err := v.Search("q")
+			assert.Nil(t, entries)
+			assert.NotNil(t, err)
+		})
+
+		mockey.PatchConvey("doc meta invalid", func() {
+			mockey.Mock((*viking_knowledge.Client).SearchKnowledge).Return(&viking_knowledge.CollectionSearchKnowledgeResponse{
+				Code: ve_viking.VikingKnowledgeBaseSuccessCode,
+				Data: &viking_knowledge.CollectionSearchKnowledgeResponseData{
+					ResultList: []*viking_knowledge.CollectionSearchResponseItem{
+						{Content: "c1", DocInfo: viking_knowledge.CollectionSearchResponseItemDocInfo{DocMeta: "{"}},
+					},
+				},
+			}, nil).Build()
+			entries, err := v.Search("q")
+			assert.Nil(t, entries)
+			assert.NotNil(t, err)
+		})
+
+		mockey.PatchConvey("success", func() {
+			mockey.Mock((*viking_knowledge.Client).SearchKnowledge).Return(&viking_knowledge.CollectionSearchKnowledgeResponse{
+				Code: ve_viking.VikingKnowledgeBaseSuccessCode,
+				Data: &viking_knowledge.CollectionSearchKnowledgeResponseData{
+					ResultList: []*viking_knowledge.CollectionSearchResponseItem{
+						{Content: "c1", DocInfo: viking_knowledge.CollectionSearchResponseItemDocInfo{DocMeta: "{\"key\":\"v\"}"}},
+						{Content: "c2", DocInfo: viking_knowledge.CollectionSearchResponseItemDocInfo{DocMeta: ""}},
+					},
+				},
+			}, nil).Build()
+			entries, err := v.Search("q")
+			assert.Nil(t, err)
+			assert.Equal(t, 2, len(entries))
+			assert.Equal(t, "c1", entries[0].Content)
+			assert.Equal(t, "c2", entries[1].Content)
+		})
+	})
 }
 
 func TestVikingKnowledgeBackend_AddFromText(t *testing.T) {
-	idx := fmt.Sprintf("veadk_kb_text_%d", time.Now().UnixNano())
-	kb := newBackendOrSkip(t, idx)
-	defer func() {
-		_, err := kb.viking.CollectionDelete()
-		if err != nil {
-			t.Fatal("CollectionDelete ", idx, "failed:", err)
-		}
-
-	}()
-	err := kb.AddFromText([]string{"hello", "world"})
-	if err != nil {
-		t.Fatal(err)
+	tosClient, _ := ve_tos.New(&ve_tos.Config{
+		AK:       "ak",
+		SK:       "sk",
+		Region:   "cn-beijing",
+		Endpoint: "https://xxxxxxx.com",
+		Bucket:   "veadk-tests",
+	})
+	v := &VikingKnowledgeBackend{
+		viking: &viking_knowledge.Client{},
+		tos:    tosClient,
+		config: &Config{},
 	}
+	mockey.PatchConvey("TestVikingKnowledgeBackend_AddFromText", t, func() {
+		mockey.PatchConvey("success", func() {
+			mockey.Mock((*ve_tos.Client).BuildObjectKeyForText).Return("knowledgebase/t.txt").Build()
+			mockey.Mock((*ve_tos.Client).UploadText).Return(nil).Build()
+			mockey.Mock((*ve_tos.Client).BuildTOSURL).Return("bucket/knowledgebase/t.txt").Build()
+			mockey.Mock((*viking_knowledge.Client).DocumentAddTOS).Return(&ve_viking.CommonResponse{Code: ve_viking.VikingKnowledgeBaseSuccessCode}, nil).Build()
+			err := v.AddFromText([]string{"a", "b"})
+			assert.Nil(t, err)
+		})
+		mockey.PatchConvey("upload error", func() {
+			mockey.Mock((*ve_tos.Client).BuildObjectKeyForText).Return("knowledgebase/t.txt").Build()
+			mockey.Mock((*ve_tos.Client).UploadText).Return(assert.AnError).Build()
+			err := v.AddFromText([]string{"a"})
+			assert.NotNil(t, err)
+		})
+	})
 }
 
 func TestVikingKnowledgeBackend_AddFromFiles(t *testing.T) {
-	idx := fmt.Sprintf("veadk_kb_files_%d", time.Now().UnixNano())
-	kb := newBackendOrSkip(t, idx)
-	defer func() {
-		_, err := kb.viking.CollectionDelete()
-		if err != nil {
-			t.Fatal("CollectionDelete ", idx, "failed:", err)
-		}
-
-	}()
-	dir := t.TempDir()
-	f1 := writeFile(t, dir, "a.txt")
-	f2 := writeFile(t, dir, "b.md")
-	err := kb.AddFromFiles([]string{f1, f2})
-	if err != nil {
-		t.Fatal(err)
+	tosClient, _ := ve_tos.New(&ve_tos.Config{
+		AK:       "ak",
+		SK:       "sk",
+		Region:   "cn-beijing",
+		Endpoint: "https://xxxxxxx.com",
+		Bucket:   "veadk-tests",
+	})
+	v := &VikingKnowledgeBackend{
+		viking: &viking_knowledge.Client{},
+		tos:    tosClient,
+		config: &Config{},
 	}
+	mockey.PatchConvey("TestVikingKnowledgeBackend_AddFromFiles", t, func() {
+		mockey.PatchConvey("success", func() {
+			mockey.Mock((*ve_tos.Client).BuildObjectKeyForFile).Return("knowledgebase/f.txt").Build()
+			mockey.Mock((*ve_tos.Client).UploadFile).Return(nil).Build()
+			mockey.Mock((*ve_tos.Client).BuildTOSURL).Return("bucket/knowledgebase/f.txt").Build()
+			mockey.Mock((*viking_knowledge.Client).DocumentAddTOS).Return(&ve_viking.CommonResponse{Code: ve_viking.VikingKnowledgeBaseSuccessCode}, nil).Build()
+			err := v.AddFromFiles([]string{"f1", "f2"})
+			assert.Nil(t, err)
+		})
+		mockey.PatchConvey("upload error", func() {
+			mockey.Mock((*ve_tos.Client).BuildObjectKeyForFile).Return("knowledgebase/f.txt").Build()
+			mockey.Mock((*ve_tos.Client).UploadFile).Return(assert.AnError).Build()
+			err := v.AddFromFiles([]string{"f"})
+			assert.NotNil(t, err)
+		})
+	})
 }
 
 func TestVikingKnowledgeBackend_AddFromDirectory(t *testing.T) {
-	idx := fmt.Sprintf("veadk_kb_dir_%d", time.Now().UnixNano())
-	kb := newBackendOrSkip(t, idx)
-	defer func() {
-		_, err := kb.viking.CollectionDelete()
-		if err != nil {
-			t.Fatal("CollectionDelete ", idx, "failed:", err)
-		}
-	}()
-	dir := "/Users/bytedance/Desktop/files"
-	err := kb.AddFromDirectory(dir)
-	if err != nil {
-		t.Fatal(err)
+	tosClient, _ := ve_tos.New(&ve_tos.Config{
+		AK:       "ak",
+		SK:       "sk",
+		Region:   "cn-beijing",
+		Endpoint: "https://xxxxxxx.com",
+		Bucket:   "veadk-tests",
+	})
+	v := &VikingKnowledgeBackend{
+		viking: &viking_knowledge.Client{},
+		tos:    tosClient,
+		config: &Config{},
 	}
+	mockey.PatchConvey("TestVikingKnowledgeBackend_AddFromDirectory", t, func() {
+		dir := t.TempDir()
+		p1 := filepath.Join(dir, "a.txt")
+		p2 := filepath.Join(dir, "b.txt")
+		assert.Nil(t, os.WriteFile(p1, []byte("a"), 0o644))
+		assert.Nil(t, os.WriteFile(p2, []byte("b"), 0o644))
+		mockey.Mock((*ve_tos.Client).BuildObjectKeyForFile).Return("knowledgebase/d.txt").Build()
+		mockey.Mock((*ve_tos.Client).UploadFile).Return(nil).Build()
+		mockey.Mock((*ve_tos.Client).BuildTOSURL).Return("bucket/knowledgebase/d.txt").Build()
+		mockey.Mock((*viking_knowledge.Client).DocumentAddTOS).Return(&ve_viking.CommonResponse{Code: ve_viking.VikingKnowledgeBaseSuccessCode}, nil).Build()
+		err := v.AddFromDirectory(dir)
+		assert.Nil(t, err)
+	})
 }

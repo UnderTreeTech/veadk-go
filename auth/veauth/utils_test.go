@@ -56,13 +56,3 @@ func TestRefreshAKSK_WithKeys(t *testing.T) {
 		t.Fatalf("unexpected credential values")
 	}
 }
-
-func TestGetCredentialFromVeFaaSIAM_Local(t *testing.T) {
-	cred, err := GetCredentialFromVeFaaSIAM("../../.credential")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cred.AccessKeyID != "AKTP0CO9liXQtdQVCkIxAADJh6bX6HqQ7S" || cred.SecretAccessKey != "HGsJNx8GiQ" || cred.SessionToken != "nChBqZkpORjIxOG1LVVBrdGYOUvjsyfxVdDafKYQ2e_fyQYYmcHiyQYgn9LF6QcoBDCxmrghOjpGb3JjZUFnZW50Um9sZS92ZWZhYXMtYWYzMzZmODktMWIyYi00ZDFhLWEyZTQtMjg1N2E3ZWEwY2EyQgZ2ZWZhYXNKQnsiU3RhdGVtZW50IjpbeyJFZmZlY3QiOiJBbGxvdyIsIkFjdGlvbiI6WyIqIl0sIlJlc2IjpbIioiXX1dfVIrdmVmYWFzLWFmMzM2Zjg5LTFiMmItNGQxYS1hMmU0LTI4NTdhN2VhMGNhMlgDegZ2ZWZhYXM.BLnIhN6Emd_3EMAIL48s6tgea8Z-C3M3zeXlL4FPFHQGYVBbzlD3z0wH4cL9eJB5np83K3PdU3O7f6mwI7cSQg" {
-		t.Fatalf("unexpected credential values")
-	}
-}

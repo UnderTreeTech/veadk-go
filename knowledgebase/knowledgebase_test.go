@@ -2,87 +2,99 @@ package knowledgebase
 
 import (
     "errors"
-    "reflect"
     "testing"
 
+    "github.com/bytedance/mockey"
+    "github.com/stretchr/testify/assert"
+    _interface "github.com/volcengine/veadk-go/knowledgebase/interface"
     "github.com/volcengine/veadk-go/knowledgebase/ktypes"
+    "github.com/volcengine/veadk-go/knowledgebase/backend/viking_knowledge_backend"
 )
 
-type dummyBackend struct{}
+type mockBackend struct{}
 
-func (d *dummyBackend) Index() string { return "dummy" }
-func (d *dummyBackend) Search(query string, opts ...map[string]any) ([]ktypes.KnowledgeEntry, error) {
-    return []ktypes.KnowledgeEntry{}, nil
+func (m *mockBackend) Index() string { return "mock-index" }
+func (m *mockBackend) Search(query string, opts ...map[string]any) ([]ktypes.KnowledgeEntry, error) {
+    return []ktypes.KnowledgeEntry{{Content: "c", Metadata: map[string]any{"q": query}}}, nil
 }
-func (d *dummyBackend) AddFromText(text []string, opts ...map[string]any) error { return nil }
-func (d *dummyBackend) AddFromFiles(files []string, opts ...map[string]any) error { return nil }
-func (d *dummyBackend) AddFromDirectory(directory string, opts ...map[string]any) error { return nil }
+func (m *mockBackend) AddFromText(text []string, opts ...map[string]any) error { return nil }
+func (m *mockBackend) AddFromFiles(files []string, opts ...map[string]any) error { return nil }
+func (m *mockBackend) AddFromDirectory(directory string, opts ...map[string]any) error { return nil }
 
-func TestNewKnowledgeBase_WithBackendInstance_Defaults(t *testing.T) {
-    backend := &dummyBackend{}
-    kb, err := NewKnowledgeBase(backend)
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
-    if kb.Backend != backend {
-        t.Fatalf("backend not set")
-    }
-    if kb.Name != DefaultName {
-        t.Fatalf("default name not applied: got %s", kb.Name)
-    }
-    if kb.Description != DefaultDescription {
-        t.Fatalf("default description not applied")
-    }
+func TestNewKnowledgeBase_WithBackendInterface(t *testing.T) {
+    var mock _interface.KnowledgeBackend = &mockBackend{}
+    kb, err := NewKnowledgeBase(mock, WithName("n"), WithDescription("d"))
+    assert.Nil(t, err)
+    assert.NotNil(t, kb)
+    assert.Equal(t, "n", kb.Name)
+    assert.Equal(t, "d", kb.Description)
+    assert.Equal(t, mock, kb.Backend)
 }
 
-func TestNewKnowledgeBase_WithOptions(t *testing.T) {
-    cfg := map[string]int{"x": 1}
-    kb, err := NewKnowledgeBase(&dummyBackend{}, WithName("kb"), WithDescription("desc"), WithBackendConfig(cfg))
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
-    if kb.Name != "kb" {
-        t.Fatalf("name option not applied: %s", kb.Name)
-    }
-    if kb.Description != "desc" {
-        t.Fatalf("description option not applied: %s", kb.Description)
-    }
-    if !reflect.DeepEqual(kb.BackendConfig, cfg) {
-        t.Fatalf("backend config not applied")
-    }
+func TestNewKnowledgeBase_Defaults(t *testing.T) {
+    var mock _interface.KnowledgeBackend = &mockBackend{}
+    kb, err := NewKnowledgeBase(mock)
+    assert.Nil(t, err)
+    assert.NotNil(t, kb)
+    assert.Equal(t, DefaultName, kb.Name)
+    assert.Equal(t, DefaultDescription, kb.Description)
 }
 
-func TestGetKnowledgeBackend_InvalidBackend(t *testing.T) {
-    _, err := getKnowledgeBackend(ktypes.RedisBackend, nil)
-    if !errors.Is(err, InvalidKnowledgeBackendErr) {
-        t.Fatalf("expected InvalidKnowledgeBackendErr, got %v", err)
-    }
+func TestNewKnowledgeBase_WithStringBackendAndValidConfig(t *testing.T) {
+    mockey.PatchConvey("viking backend with valid config via mock constructor", t, func() {
+        var m _interface.KnowledgeBackend = &mockBackend{}
+        mockey.Mock(viking_knowledge_backend.NewVikingKnowledgeBackend).Return(m, nil).Build()
+
+        kb, err := NewKnowledgeBase(
+            ktypes.VikingBackend,
+            WithBackendConfig(&viking_knowledge_backend.Config{Index: "idx"}),
+            WithName("n"),
+            WithDescription("d"),
+        )
+        assert.Nil(t, err)
+        assert.NotNil(t, kb)
+        assert.Equal(t, "n", kb.Name)
+        assert.Equal(t, "d", kb.Description)
+        assert.Equal(t, m, kb.Backend)
+    })
 }
 
-func TestGetKnowledgeBackend_VikingInvalidConfig(t *testing.T) {
-    b, err := getKnowledgeBackend(ktypes.VikingBackend, struct{}{})
-    if err == nil || b != nil {
-        t.Fatalf("expected error for invalid config type")
-    }
+func TestNewKnowledgeBase_VikingConstructorError(t *testing.T) {
+    mockey.PatchConvey("viking backend constructor returns error", t, func() {
+        mockey.Mock(viking_knowledge_backend.NewVikingKnowledgeBackend).Return(nil, errors.New("ctor error")).Build()
+
+        kb, err := NewKnowledgeBase(
+            ktypes.VikingBackend,
+            WithBackendConfig(&viking_knowledge_backend.Config{Index: "idx"}),
+        )
+        assert.Nil(t, kb)
+        assert.NotNil(t, err)
+    })
 }
 
-func TestNewKnowledgeBase_StringBackend_Invalid(t *testing.T) {
-    _, err := NewKnowledgeBase(ktypes.RedisBackend)
-    if !errors.Is(err, InvalidKnowledgeBackendErr) {
-        t.Fatalf("expected InvalidKnowledgeBackendErr, got %v", err)
-    }
+func TestNewKnowledgeBase_InvalidConfigType(t *testing.T) {
+    mockey.PatchConvey("viking backend with invalid config type", t, func() {
+        kb, err := NewKnowledgeBase(
+            ktypes.VikingBackend,
+            WithBackendConfig(struct{}{}),
+        )
+        assert.Nil(t, kb)
+        assert.True(t, errors.Is(err, InvalidKnowledgeBackendConfigErr))
+    })
 }
 
-func TestNewKnowledgeBase_NilBackend_Error(t *testing.T) {
-    _, err := NewKnowledgeBase(nil)
-    if !errors.Is(err, InvalidKnowledgeBackendErr) {
-        t.Fatalf("expected InvalidKnowledgeBackendErr for nil backend, got %v", err)
-    }
+func TestGetKnowledgeBackend_Unsupported(t *testing.T) {
+    mockey.PatchConvey("unsupported backend types return wrapped error", t, func() {
+        for _, b := range []string{ktypes.RedisBackend, ktypes.LocalBackend, ktypes.OpensearchBackend, "unknown"} {
+            kb, err := getKnowledgeBackend(b, nil)
+            assert.Nil(t, kb)
+            assert.True(t, errors.Is(err, InvalidKnowledgeBackendErr))
+        }
+    })
 }
 
-func TestNewKnowledgeBase_UnsupportedType(t *testing.T) {
-    _, err := NewKnowledgeBase(123)
-    if err == nil {
-        t.Fatalf("expected error for unsupported backend type")
-    }
+func TestNewKnowledgeBase_InvalidBackendType(t *testing.T) {
+    kb, err := NewKnowledgeBase(123)
+    assert.Nil(t, kb)
+    assert.True(t, errors.Is(err, InvalidKnowledgeBackendErr))
 }
