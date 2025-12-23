@@ -103,7 +103,7 @@ go run agent.go web api webui
 If a large agent takes a long time to run, you can increase the timeout parameter.
 
 ```shell
-go run agent.go web -read-timeout 3m -write-timeout 3m api 
+go run agent.go web -read-timeout 3m -write-timeout 3m api webui
 ```
 
 
